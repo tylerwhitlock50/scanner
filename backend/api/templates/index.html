@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload and Process Image</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 600px;
+            text-align: center;
+        }
+        h1 {
+            color: #333;
+        }
+        form {
+            margin-top: 20px;
+        }
+        input[type="file"] {
+            display: block;
+            margin: 10px auto;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            margin-top: 20px;
+            display: none;
+        }
+        #detected-text-container {
+            display: none;
+            margin-top: 20px;
+        }
+        #detected-text {
+            padding: 10px;
+            background-color: #f4f4f4;
+            border-radius: 5px;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        .copy-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin-top: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .copy-btn:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Upload a Picture</h1>
+        <form id="upload-form" method="POST" enctype="multipart/form-data" action="/upload">
+            <label for="file">Choose a picture:</label>
+            <input type="file" id="file" name="file" accept="image/*" required>
+            <button type="submit">Upload</button>
+        </form>
+
+        <!-- Image preview -->
+        <img id="preview" src="" alt="Uploaded Image Preview">
+
+        <!-- Detected text and copy button -->
+        <div id="detected-text-container">
+            <h3>Detected Text:</h3>
+            <p id="detected-text"></p>
+            <button class="copy-btn" id="copy-btn">Copy Text</button>
+        </div>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('upload-form');
+        const fileInput = document.getElementById('file');
+        const previewImg = document.getElementById('preview');
+        const detectedTextContainer = document.getElementById('detected-text-container');
+        const detectedTextElem = document.getElementById('detected-text');
+        const copyBtn = document.getElementById('copy-btn');
+    
+        // Preview the image when it's uploaded
+        fileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    previewImg.src = e.target.result;
+                    previewImg.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    
+        // Handle the form submission with AJAX
+        uploadForm.addEventListener('submit', function(event) {
+            event.preventDefault(); // Prevent the default form submission
+    
+            const formData = new FormData();
+            const fileField = fileInput.files[0];
+    
+            formData.append('file', fileField);
+    
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    alert("Error: " + data.error);
+                } else {
+                    // Show the detected text
+                    detectedTextElem.textContent = data.detected_text;
+                    detectedTextContainer.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error uploading image');
+            });
+        });
+    
+        // Copy detected text to clipboard
+        copyBtn.addEventListener('click', function() {
+            const textToCopy = detectedTextElem.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                alert('Text copied to clipboard!');
+            }).catch(err => {
+                console.error('Error copying text: ', err);
+            });
+        });
+    </script>
+    

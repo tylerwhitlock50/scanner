@@ -1,0 +1,11 @@
+flask
+opencv-python
+python-dotenv
+requests
+flask-cors
+gunicorn
+flask-wtf
+pillow
+flask-sqlalchemy
+google-cloud-vision
+

@@ -1,0 +1,14 @@
+backend
+├── .env
+├── .gitignore
+├── api
+│   ├── routes.py
+│   ├── templates
+│   │   └── index.html
+│   ├── __init__.py
+│   └── __pycache__
+│       ├── routes.cpython-312.pyc
+│       └── __init__.cpython-312.pyc
+├── app.py
+├── requirements.txt
+└── service-account-file.json
