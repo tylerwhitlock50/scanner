@@ -8,4 +8,5 @@ flask-wtf
 pillow
 flask-sqlalchemy
 google-cloud-vision
+marshmallow
 
