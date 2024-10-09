@@ -14,6 +14,8 @@
   
   <script>
   import { useBatchStore } from '../stores/batchStore';
+  import { ref } from 'vue';
+
   
   export default {
     emits: ['serial-number-confirmed'],
