@@ -6,45 +6,62 @@
       {{ snackbarMessage }}
     </v-snackbar>
 
+    <div class="batch-info">
+    <p><strong>Batch Number:</strong> {{ batchStore.batchData.batchNumber }}</p>
+    <p><strong>Item:</strong> {{ batchStore.batchData.currentCount + 1 }} of {{ batchStore.batchData.numberOfItems }}</p>
+    <p><strong>Last Scanned Serial Number:</strong> {{ lastScannedSerialNumber }}</p>
+  </div>
+
     <div class="ocr-container">
+        <!-- Batch Information -->
+
       <div v-if="!imageCaptured" class="video-wrapper">
         <div class="video-container">
           <video ref="video" autoplay></video>
         </div>
-        <button @click="captureImage" class="btn-primary">Capture Image</button>
+        <v-btn color="primary" @click="captureImage">Capture Image</v-btn>
       </div>
   
       <div v-if="imageCaptured" class="image-wrapper">
         <img :src="capturedImageUrl" alt="Captured Image" class="captured-image" />
-        <button @click="sendImage" class="btn-primary">Send to OCR</button>
-        <button @click="resetCapture" class="btn-secondary">Retake Image</button>
+        <v-btn color="primary" @click="sendImage">Send to OCR</v-btn>
+        <v-btn color="secondary" @click="resetCapture">Retake Image</v-btn>
       </div>
   
       <canvas ref="canvas" width="640" height="480" style="display:none;"></canvas>
   
-      <pre>{{ apiResponse }}</pre>
+      <!-- <pre>{{ apiResponse }}</pre> -->
     </div>
   
     <!-- Modal Dialog for Serial Number Confirmation -->
-    <div v-if="showModal" class="modal-overlay">
+      <!-- Vuetify Dialog for Serial Number Confirmation -->
+      <v-dialog v-model="showModal" max-width="400px">
+  <v-card>
+    <v-card-title>Confirm Serial Number</v-card-title>
+    <v-card-text>
+      <v-text-field
+        label="Serial Number"
+        v-model="serialNumber"
+        outlined
+        dense
+      ></v-text-field>
+      <v-checkbox
+        label="Product Tested"
+        v-model="tested"
+        dense
+      ></v-checkbox>
+    </v-card-text>
+    <v-card-actions class="d-flex flex-column">
+      <!-- Stack buttons vertically -->
+      <v-btn color="primary" class="mb-2" @click="submitData">Submit</v-btn>
+      <v-btn color="secondary" @click="closeModal">Cancel</v-btn>
+    </v-card-actions>
+  </v-card>
+</v-dialog>
 
-      <div class="modal">
-        <h2>Confirm Serial Number</h2>
-        <label for="serialNumberInput">Serial Number:</label>
-        <input id="serialNumberInput" v-model="serialNumber" />
-  
-        <div class="form-group">
-          <input type="checkbox" id="testedCheckbox" v-model="tested" />
-          <label for="testedCheckbox">Product Tested</label>
-        </div>
-  
-        <button @click="submitData" class="btn-primary">Submit</button>
-        <button @click="closeModal" class="btn-secondary">Cancel</button> 
-      </div>
 
 
-
-    </div>
+ 
 
   </template>
   
@@ -53,7 +70,19 @@
   import { useBatchStore } from '../stores/batchStore';
   import { useRouter } from 'vue-router';
   import api from '../services/api';
-  import { VSnackbar } from 'vuetify/lib/components/index.mjs';
+  //import { VSnackbar } from 'vuetify/lib/components/index.mjs';
+  import {
+  VSnackbar,
+  VDialog,
+  VCard,
+  VCardTitle,
+  VCardText,
+  VCardActions,
+  VBtn,
+  VCheckbox,
+  VTextField,
+  VSpacer,
+} from 'vuetify/lib/components/index.mjs';
   
   const capturedImageUrl = ref(null);
   const imageCaptured = ref(false);
@@ -71,6 +100,7 @@
   const canvas = ref(null);
   
   const batchStore = useBatchStore();
+  const lastScannedSerialNumber = ref('None');
   const router = useRouter();
 
   const isBatchDataEmpty = () => {
@@ -169,6 +199,10 @@
     batch_quantity: batchData.numberOfItems,
     batch_item_no: batchData.partNumber,
     part_id: batchData.partNumber,
+
+    batch_type: batchData.batchType,
+    batch_description: batchData.batchDescription,
+
     verified_sn: serialNumber.value,
     is_verified: false,
 
@@ -176,9 +210,9 @@
     testing_selected: tested.value,
 
     // Default values for other required fields
-    recorded_sn: true,
-    recorded_sn_timestamp: new Date().toISOString(),
-    recorded_sn_user: 'operator', // Replace with actual operator ID if available
+    //recorded_sn: false,
+    //recorded_sn_timestamp: new Date().toISOString(),
+    //recorded_sn_user: 'None', // Replace with actual operator ID if available
     sn_status_id: 1, // Set appropriate status ID
   };
   
@@ -188,6 +222,15 @@
         console.log('Serial number record created', response.data);
         closeModal();
         // Reset for the next item
+        batchStore.incrementCurrentCount();
+        lastScannedSerialNumber.value = dataToSubmit.verified_sn;
+
+        if (batchStore.batchData.currentCount >= batchStore.batchData.numberOfItems) {
+          showNotification('Batch completed. Redirecting to Batch Review page...', 3000);
+          router.push({ name: 'TransactionReviewView' });
+        } else {
+          resetCapture();
+        }
         resetCapture();
       })
       .catch((error) => {
@@ -385,6 +428,29 @@ pre {
 .modal button {
   margin-top: 15px;
   width: 100%;
+}
+.batch-info {
+  background-color: #fff;
+  padding: 2px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.batch-info p {
+  margin: 5px 0;
+  font-size: 10px;
+}
+
+.v-selection-control__input input {
+    CONTAIN-INTRINSIC-BLOCK-SIZE: auto none;
+    cursor: pointer;
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    opacity: .75 !important;
 }
   </style>
   

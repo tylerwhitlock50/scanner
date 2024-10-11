@@ -11,7 +11,7 @@
         <p><strong>Difference:</strong> {{ difference }}</p>
       </div>
       <div class="col-md-6 text-md-right">
-        <button class="btn btn-primary mb-2" @click="downloadReport">Download Report</button>
+        <button class="btn btn-primary mb-2" @click="downloadReport">Download Barcodes</button>
       </div>
     </div>
     <div class="table-responsive">

@@ -4,6 +4,7 @@ from .models import SerialNumberRecord, SnStatus
 from .extensions import db
 from marshmallow import Schema, fields, validate, ValidationError
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import or_, and_
 
 # Define a blueprint
 crud = Blueprint('crud', __name__)
@@ -37,6 +38,8 @@ class SerialNumberRecordSchema(Schema):
     batch_quantity = fields.Int()
     batch_item_no = fields.Str()
     part_id = fields.Str(required=True)
+    batch_type = fields.Str()
+    batch_description = fields.Str()
 
     # Testing-related fields
     testing_selected = fields.Bool(missing=False)
@@ -164,6 +167,7 @@ def query_serial_numbers():
     voided = request.args.get('voided')
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+    recorded_sn = request.args.get('recorded_sn')
 
     # Base query excluding soft-deleted records
     query = SerialNumberRecord.query.filter_by(is_deleted=False)
@@ -202,6 +206,15 @@ def query_serial_numbers():
         # Filter by user
         if user:
             query = query.filter(SerialNumberRecord.uploaded_by == user)
+
+        # Filter by recorded SN status
+        if recorded_sn is not None:
+            if recorded_sn.lower() == 'true':
+                query = query.filter(SerialNumberRecord.recorded_sn == True)
+            elif recorded_sn.lower() == 'false':
+                query = query.filter(SerialNumberRecord.recorded_sn == False)
+            else:
+                return jsonify({"error": "Invalid recorded_sn parameter. Expected 'true' or 'false'."}), 400
 
         # Filter by voided status
         if voided is not None:
@@ -247,3 +260,105 @@ def delete_serial_number(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
+    
+@crud.route('/serial_numbers/query_v2', methods=['GET'])
+def query_serial_numbers_v2():
+    # Get all query parameters
+    params = request.args.to_dict()
+    
+    # Pagination parameters
+    page = int(params.pop('page', 1))
+    per_page = int(params.pop('per_page', 20))
+    
+    # Sorting parameters
+    sort_by = params.pop('sort_by', None)
+    sort_order = params.pop('sort_order', 'asc')
+    
+    # Base query excluding soft-deleted records
+    query = SerialNumberRecord.query.filter_by(is_deleted=False)
+    
+    # Dynamic filtering
+    filter_conditions = []
+    for key, value in params.items():
+        if hasattr(SerialNumberRecord, key):
+            column = getattr(SerialNumberRecord, key)
+            if isinstance(column.type, db.String):
+                filter_conditions.append(column.ilike(f"%{value}%"))
+            elif isinstance(column.type, (db.Integer, db.Float)):
+                try:
+                    filter_conditions.append(column == type(column.type.python_type)(value))
+                except ValueError:
+                    return jsonify({"error": f"Invalid value for {key}."}), 400
+            elif isinstance(column.type, db.Boolean):
+                if value.lower() == 'true':
+                    filter_conditions.append(column == True)
+                elif value.lower() == 'false':
+                    filter_conditions.append(column == False)
+                else:
+                    return jsonify({"error": f"Invalid boolean value for {key}. Expected 'true' or 'false'."}), 400
+            elif isinstance(column.type, db.DateTime):
+                try:
+                    date_value = datetime.strptime(value, "%Y-%m-%d")
+                    filter_conditions.append(column >= date_value)
+                except ValueError:
+                    return jsonify({"error": f"Invalid date format for {key}. Expected YYYY-MM-DD."}), 400
+            else:
+                # For other types, attempt exact match
+                filter_conditions.append(column == value)
+        else:
+            # Ignore unknown parameters or handle as needed
+            pass
+    
+    # Apply filters
+    if filter_conditions:
+        query = query.filter(and_(*filter_conditions))
+    
+    # Apply sorting
+    if sort_by and hasattr(SerialNumberRecord, sort_by):
+        column = getattr(SerialNumberRecord, sort_by)
+        if sort_order == 'desc':
+            query = query.order_by(column.desc())
+        else:
+            query = query.order_by(column.asc())
+    
+    # Apply pagination
+    pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+    serial_numbers = pagination.items
+
+    # Serialize results
+    result = serial_numbers_schema.dump(serial_numbers)
+
+    return jsonify({
+        "total": pagination.total,
+        "pages": pagination.pages,
+        "current_page": pagination.page,
+        "per_page": pagination.per_page,
+        "data": result
+    }), 200
+
+@crud.route('/batch', methods=['GET'])
+def check_batch():
+    batch_id = str(request.args.get('batch_id'))
+    if not batch_id:
+        return jsonify({"error": "batch_id is required"}), 400
+
+    try:
+        records = SerialNumberRecord.query.filter_by(batch_id=batch_id, is_deleted=False).all()
+        if records:
+            # Assuming all records in a batch have the same part_id and batch_quantity
+            first_record = records[0]
+            batch_info = {
+                "batch_id": batch_id,
+                "part_number": first_record.part_id,
+                "batch_quantity": first_record.batch_quantity,
+                "total_records": len(records),
+                "records": serial_numbers_schema.dump(records)
+            }
+            return jsonify(batch_info), 200
+        else:
+            # Batch does not exist
+            return jsonify({"message": "Batch not found."}), 404
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+            

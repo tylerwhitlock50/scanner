@@ -9,6 +9,8 @@ export const useBatchStore = defineStore('batch', {
       partNumber: '', // Example default value
       batchVerified: false,
       currentCount: 0,
+      batchType: 'inbound', // Example default value
+      batch_description: '', // Example default value
     },
   }),
   actions: {
@@ -17,13 +19,15 @@ export const useBatchStore = defineStore('batch', {
       return this.batchData;
     },
     // Method to set or update batch data
-    setBatchData(batchNumber, numberOfItems, partNumber) {
+    setBatchData(batchNumber, numberOfItems, partNumber, batchType, batch_description) {
       this.batchData = {
         batchNumber: batchNumber,
         numberOfItems: numberOfItems,
         partNumber: partNumber,
         batchVerified: false,
         currentCount: 0,
+        batchType: batchType,
+        batch_description: batch_description,
       };
     },
     // Method to verify batch
@@ -33,6 +37,10 @@ export const useBatchStore = defineStore('batch', {
     // Method to increment current count
     incrementCurrentCount() {
       this.batchData.currentCount++;
+    },
+    // Method to update current count
+    setCurrentCount(count) {
+      this.batchData.currentCount = count;
     },
   },
 });

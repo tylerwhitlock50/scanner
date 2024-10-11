@@ -44,7 +44,7 @@ def isolate_serial_number(text):
         return match.group(1) 
 
     # If no serial number is found, return None (or an appropriate message)
-    return 'No Serial Number Detected'  
+    return 'None'  
 
 
 def preprocess_image(image):

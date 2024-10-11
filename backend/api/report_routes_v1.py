@@ -3,7 +3,7 @@ import io
 from reportlab.lib.pagesizes import letter  # Using letter size for more space
 from reportlab.pdfgen import canvas
 from reportlab.lib import utils
-from barcode import Code128
+from barcode.codex import Code128
 from barcode.writer import ImageWriter
 from PIL import Image
 from .models import SerialNumberRecord
@@ -34,7 +34,7 @@ def generate_report():
 
         # Grid configuration: 4 columns, 5 rows per page
         columns = 3
-        rows_per_page = 6
+        rows_per_page = 8
         x_margin = 50  # Margin from left
         y_margin = height - 100  # Start margin from the top
         x_spacing = (width - 2 * x_margin - columns * barcode_width) / (columns - 1)

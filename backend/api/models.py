@@ -29,6 +29,8 @@ class SerialNumberRecord(db.Model):
     batch_quantity = db.Column(db.Integer)  # total quantity of items in the batch
     batch_item_no = db.Column(db.Integer)  # item number in the batch
     part_id = db.Column(db.String(50), nullable=False)  # item 
+    batch_type = db.Column(db.String(50))  # work order / receiving documents
+    batch_description = db.Column(db.Text)  # work order / receiving documents
 
     # Item Selected for testing
     testing_selected = db.Column(db.Boolean, default=False)
@@ -57,3 +59,8 @@ class SnStatus(db.Model):  # Renamed for Python class naming convention
     id = db.Column(db.Integer, primary_key=True)
     status = db.Column(db.String(50), unique=True, nullable=False)
     description = db.Column(db.Text)
+
+
+
+
+

@@ -2,7 +2,7 @@
   <div class="app-container">
     <nav class="navbar navbar-expand-lg navbar-light bg-light w-100">
       <a class="navbar-brand" href="#">
-        <img alt="Company Logo" class="logo" src="@/assets/Huxlogo.webp"/>
+        <img alt="Company Logo" class="logo" src="@/assets/HuxLogo.webp"/>
       </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon"></span>
@@ -16,7 +16,13 @@
             <RouterLink class="nav-link" to="/scan">OCR-Scan</RouterLink>
           </li>
           <li class="nav-item">
-            <RouterLink class="nav-link" to="/review">Review</RouterLink>
+            <RouterLink class="nav-link" to="/review">Batch Review</RouterLink>
+          </li>
+          <li class="nav-item">
+            <RouterLink class="nav-link" to="/compliance">Compliance Review</RouterLink>
+          </li>
+          <li class="nav-item">
+            <RouterLink class="nav-link" to="/reporting">Reports</RouterLink>
           </li>
         </ul>
       </div>

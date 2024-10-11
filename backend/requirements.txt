@@ -9,6 +9,8 @@ pillow
 flask-sqlalchemy
 google-cloud-vision
 marshmallow
-barcode
+python-barcode
 pandas
 reportlab
+psycopg2-binary
+gunicorn
