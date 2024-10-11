@@ -1,6 +1,6 @@
 <template>
     <div class="ocr-container">
-      <h1>OCR Scanning</h1>
+      <!-- <h1>OCR Scanning</h1> -->
   
       <div v-if="!imageCaptured" class="video-wrapper">
         <div class="video-container">
@@ -104,8 +104,8 @@
   <style scoped>
   .ocr-container {
     max-width: 500px;
-    margin: 50px auto;
-    padding: 20px;
+    margin: auto;
+    padding: 10px;
     background-color: #f9f9f9;
     border-radius: 8px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
@@ -134,15 +134,16 @@
   
   video {
     width: 100%;
+    max-width: 100%;
     height: auto;
-    border-radius: 8px;
+    border-radius: 1rem;
     border: 1px solid #ccc;
   }
   
   .captured-image {
     width: 100%;
     max-width: 100%;
-    border-radius: 8px;
+    border-radius: 1rem;
     border: 1px solid #ccc;
     margin-bottom: 1rem;
   }

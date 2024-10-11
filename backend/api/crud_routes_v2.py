@@ -30,6 +30,7 @@ class SerialNumberRecordSchema(Schema):
     )
     is_ocr_corrected = fields.Bool(missing=False)
     verified_sn = fields.Str(required=True)
+    is_verified = fields.Bool(missing=False)
 
     # Batch information fields
     batch_id = fields.Str()

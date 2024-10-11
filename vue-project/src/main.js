@@ -1,14 +1,25 @@
-import './assets/main.css'
+import './assets/main.css';
 
-import { createApp } from 'vue'
-import { createPinia } from 'pinia'
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
 
-import App from './App.vue'
-import router from './router'
+import App from './App.vue';
+import router from './router';
 
-const app = createApp(App)
+// Import Bootstrap styles
+import 'bootstrap/dist/css/bootstrap.min.css';
+import 'bootstrap';
 
-app.use(createPinia())
-app.use(router)
+// Import Vuetify from the plugins folder
+import vuetify from './plugins/vuetify';
 
-app.mount('#app')
+// Create the app instance
+const app = createApp(App);
+
+// Use Vuetify, Pinia, and the router
+app.use(vuetify);  // Make sure Vuetify is used
+app.use(createPinia());
+app.use(router);
+
+// Mount the app
+app.mount('#app');

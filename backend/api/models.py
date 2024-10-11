@@ -22,6 +22,7 @@ class SerialNumberRecord(db.Model):
     # Did the OCR system detect the serial number correctly?
     is_ocr_corrected = db.Column(db.Boolean, default=False)
     verified_sn = db.Column(db.String(255), nullable=False)
+    is_verified = db.Column(db.Boolean, default=False)
 
     # Information about the batch and item in the batch
     batch_id = db.Column(db.String(50))  # work order / receiving documents

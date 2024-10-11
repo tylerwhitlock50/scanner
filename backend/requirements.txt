@@ -9,4 +9,6 @@ pillow
 flask-sqlalchemy
 google-cloud-vision
 marshmallow
-
+barcode
+pandas
+reportlab

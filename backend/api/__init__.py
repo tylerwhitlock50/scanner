@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
 from .ocr_routes import ocr
 from .crud_routes_v2 import crud
+from .report_routes_v1 import reports
 from .extensions import db
 import os
 from dotenv import load_dotenv
@@ -31,5 +32,6 @@ def create_app():
     # Register blueprints
     app.register_blueprint(ocr)
     app.register_blueprint(crud)
+    app.register_blueprint(reports)
 
     return app
