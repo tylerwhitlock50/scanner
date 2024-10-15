@@ -21,9 +21,12 @@
       <div class="form-group">
         <label for="batchType">Batch Type:</label>
         <select v-model="batchType" id="batchType" required>
+          <option value="Purchase">Purchase</option>
           <option value="Production">Production</option>
-          <option value="Receiving">Receiving</option>
-          <option value="Outbound">Outbound</option>
+          <option value="Sale">Sale</option>
+          <option value="Return">Return</option>
+          <option value="Transfer">Transfer</option>
+          <option value="Destruction">Destruction</option>
           <option value="Other">Other</option>
         </select>
       </div>
@@ -34,7 +37,9 @@
         <textarea v-model="batchDescription" id="batchDescription" rows="3"></textarea>
       </div>
 
-      <button type="submit" class="btn-primary">Start Scanning</button>
+      <button type="submit" class="btn-primary" :disabled="isLoading">
+        {{ isLoading ? 'Processing...' : 'Start Scanning' }}
+      </button>
     </form>
   </div>
 </template>
@@ -42,7 +47,7 @@
 <script>
 import { useBatchStore } from '../stores/batchStore';
 import { useRouter } from 'vue-router';
-import { ref, onMounted } from 'vue';
+import { ref } from 'vue';
 import api from '../services/api';
 
 export default {
@@ -56,63 +61,60 @@ export default {
     const partNumber = ref('');
     const batchType = ref('Production'); // Default value
     const batchDescription = ref('');
+    const isLoading = ref(false);
+    const batchExists = ref(false);  // Track if the batch exists
 
-    const submitBatch = () => {
-      if (batchNumber.value && numberOfItems.value > 0 && partNumber.value) {
-        // Set batch data in the store, including the new fields
-        batchStore.setBatchData(
-          batchNumber.value,
-          numberOfItems.value,
-          partNumber.value,
-          batchType.value,
-          batchDescription.value
-        );
-        router.push({ name: 'OCRScanning' });
-      } else {
-        alert('Please enter valid batch information.');
-      }
-    };
-
+    // Check if batch exists and update the store
     const checkBatchExists = async () => {
-      if (!batchNumber.value) {
-        return;
-      }
+      if (!batchNumber.value) return;
 
       try {
         const response = await api.get('/batch', {
-          params: { batch_id: batchNumber.value },
+          params: { batch_number: batchNumber.value },
         });
+
         if (response.status === 200) {
           const data = response.data;
           const overwrite = confirm(
             `Batch ${batchNumber.value} exists with ${data.total_records} records.\n` +
-              `Part Number: ${data.part_number}\n` +
-              `Batch Quantity: ${data.batch_quantity}\n\n` +
-              `Do you want to load this batch?`
+            `Part Number: ${data.part_number}\n` +
+            `Batch Quantity: ${data.batch_quantity}\n\n` +
+            `Do you want to load this batch?`
           );
+
           if (overwrite) {
-            // Pre-fill the form fields
+            // Pre-fill the form fields and update the store
             numberOfItems.value = data.batch_quantity || 0;
             partNumber.value = data.part_number || '';
-            // Add default values for new fields
-            batchType.value = 'Production'; // Reset to default
-            batchDescription.value = ''; // Reset description
-            // Update the batch store
+            batchType.value = data.batch_type || 'Production';
+            batchDescription.value = data.batch_description || '';
+
+            // Set batch data in the store
             batchStore.setBatchData(
               batchNumber.value,
               numberOfItems.value,
               partNumber.value,
               batchType.value,
-              batchDescription.value
+              batchDescription.value,
+              data.batch_id
             );
+
+            // Update the current count in the store
             batchStore.setCurrentCount(data.total_records);
+
+            // Indicate that the batch exists and skip creation
+            batchExists.value = true;
+
+            // Redirect to the scanning page
+            router.push({ name: 'OCRScanning' });
           } else {
-            batchNumber.value = ''; // Clear batch number if user doesn't load the existing batch
+            batchNumber.value = '';  // Clear the batch number if the user cancels
           }
         }
       } catch (error) {
         if (error.response && error.response.status === 404) {
           console.log('Batch not found, proceeding with new batch.');
+          batchExists.value = false;  // Set batchExists to false if batch is not found
         } else {
           console.error('Error checking batch:', error);
           alert('An error occurred while checking the batch. Please try again.');
@@ -120,32 +122,54 @@ export default {
       }
     };
 
-    const checkForExistingBatchData = () => {
-      const existingBatchData = batchStore.getBatchData();
-      if (
-        existingBatchData.batchNumber !== '' ||
-        existingBatchData.numberOfItems > 0 ||
-        existingBatchData.partNumber !== ''
-      ) {
-        const overwrite = confirm(
-          'Existing batch data has been found in your session.\n' +
-            'Do you want to load this data?'
-        );
-        if (overwrite) {
-          batchNumber.value = existingBatchData.batchNumber;
-          numberOfItems.value = existingBatchData.numberOfItems;
-          partNumber.value = existingBatchData.partNumber;
-          batchType.value = existingBatchData.batchType;
-          batchDescription.value = existingBatchData.batch_description;
+    // Submit batch logic (creates new batch if it doesn't exist)
+    const submitBatch = async () => {
+      if (batchExists.value) {
+        // If batch already exists, just go to the scanning page
+        router.push({ name: 'OCRScanning' });
+        return;
+      }
+
+      if (!batchNumber.value || numberOfItems.value <= 0 || !partNumber.value) {
+        alert('Please enter valid batch information.');
+        return;
+      }
+
+      isLoading.value = true;
+
+      try {
+        // Create a new batch if it doesn't exist
+        const response = await api.post('/batch', {
+          batch_number: batchNumber.value,
+          number_of_items: numberOfItems.value,
+          part_number: partNumber.value,
+          batch_type: batchType.value,
+          batch_description: batchDescription.value,
+        });
+
+        if (response.status === 201) {
+          // Save batch data to the store
+          batchStore.setBatchData(
+            batchNumber.value,
+            numberOfItems.value,
+            partNumber.value,
+            batchType.value,
+            batchDescription.value,
+            response.data.data.id
+          );
+
+          // Redirect to the scanning page
+          router.push({ name: 'OCRScanning' });
         } else {
-          batchStore.setBatchData('', 0, '', batchStore.batchData.batchType, '');
+          alert('Batch creation failed. Please try again.');
         }
+      } catch (error) {
+        console.error('Error creating batch:', error);
+        alert('An error occurred. Please try again.');
+      } finally {
+        isLoading.value = false;
       }
     };
-
-    onMounted(() => {
-      checkForExistingBatchData();
-    });
 
     return {
       batchNumber,
@@ -155,6 +179,7 @@ export default {
       batchDescription,
       submitBatch,
       checkBatchExists,
+      isLoading,
     };
   },
 };

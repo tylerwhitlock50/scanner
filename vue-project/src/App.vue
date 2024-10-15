@@ -24,6 +24,9 @@
           <li class="nav-item">
             <RouterLink class="nav-link" to="/reporting">Reports</RouterLink>
           </li>
+          <li class="nav-item">
+            <RouterLink class="nav-link" to="/bulk">Bulk Add</RouterLink>
+          </li>
         </ul>
       </div>
     </nav>

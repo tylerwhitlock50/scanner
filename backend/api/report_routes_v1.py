@@ -6,20 +6,30 @@ from reportlab.lib import utils
 from barcode.codex import Code128
 from barcode.writer import ImageWriter
 from PIL import Image
-from .models import SerialNumberRecord
-from .crud_routes_v2 import serial_numbers_schema
+from .models import SerialNumberRecord, BatchInfo
+from .crud_routes_v3 import serial_numbers_schema
 
 reports = Blueprint('reports', __name__)
 
 @reports.route('/serial_numbers/report', methods=['GET'])
 def generate_report():
-    batch_id = request.args.get('batch_id')
+    batch_id = str(request.args.get('batch_id'))
     if not batch_id:
         return jsonify({"error": "batch_id is required"}), 400
 
     try:
-        # Query the records
-        records = SerialNumberRecord.query.filter_by(batch_id=batch_id, is_deleted=False).all()
+        # Query the batch record first to get the batch_info_id
+        batch_record = BatchInfo.query.filter_by(batch_number=batch_id).first()
+
+        if not batch_record:
+            return jsonify({"message": "Batch not found."}), 404
+
+        # Query for serial numbers associated with the batch using batch_info_id
+        records = SerialNumberRecord.query.filter(
+            SerialNumberRecord.batch_info_id == batch_record.id,
+            SerialNumberRecord.is_deleted == False
+        ).all()
+        
         data = serial_numbers_schema.dump(records)
 
         # Prepare a PDF file with letter page size

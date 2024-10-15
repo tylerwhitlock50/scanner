@@ -1,6 +1,6 @@
 from flask import jsonify, request, Blueprint
 from datetime import datetime
-from .models import SerialNumberRecord
+from .models import SerialNumberRecord,  BatchInfo, BatchReferences
 from .extensions import db
 from marshmallow import Schema, fields, validate, ValidationError
 from sqlalchemy.exc import IntegrityError
@@ -40,6 +40,8 @@ class SerialNumberRecordSchema(Schema):
     part_id = fields.Str(required=True)
     batch_type = fields.Str()
     batch_description = fields.Str()
+    
+    batch_info_id = fields.Int()  # Foreign key to BatchInfo
 
     # Testing-related fields
     testing_selected = fields.Bool(missing=False)
@@ -54,7 +56,9 @@ class SerialNumberRecordSchema(Schema):
     recorded_sn_user = fields.Str()
 
     # Serial number status (foreign key)
-    sn_status_id = fields.Int()
+    sn_status_id = fields.Str(
+        validate=validate.OneOf(["NewScan", "Compliance", "Complete"]),
+        missing="NewScan")
 
     # Voiding-related fields
     voided = fields.Bool(missing=False)
@@ -70,6 +74,32 @@ class SerialNumberRecordSchema(Schema):
 # Instantiate schemas
 serial_number_schema = SerialNumberRecordSchema()
 serial_numbers_schema = SerialNumberRecordSchema(many=True)
+
+# Marshmallow schema for BatchInfo
+class BatchInfoSchema(Schema):
+    id = fields.Int(dump_only=True)
+    batch_number = fields.Str(required=True)
+    number_of_items = fields.Int(required=True)
+    part_number = fields.Str(required=True)
+    batch_description = fields.Str()
+    batch_type = fields.Str(
+        validate=validate.OneOf(["Purchase", "Sale", "Destruction", "Production",'Transfer','Return','Other']),
+        missing="Purchase")
+    last_scanned_item = fields.Str()
+    current_item_number = fields.Int()
+
+    # Related serial numbers
+    serial_number_records = fields.Nested(SerialNumberRecordSchema, many=True)
+
+class BatchReferencesSchema(Schema):
+    id = fields.Int(dump_only=True)
+    file_name = fields.Str(required=True)
+    file_description = fields.Str()
+    batch_info_id = fields.Int()
+
+# Instantiate BatchInfo and BatchReferences schemas
+batch_info_schema = BatchInfoSchema()
+batch_references_schema = BatchReferencesSchema()
 
 # Create a new serial number record
 @crud.route('/serial_number', methods=['POST'])
@@ -98,7 +128,7 @@ def create_serial_number():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
-
+    
 # Update an existing serial number record
 @crud.route('/serial_number/<int:id>', methods=['PUT'])
 def update_serial_number(id):
@@ -128,7 +158,7 @@ def update_serial_number(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
-
+    
 # Void a serial number record
 @crud.route('/serial_number/<int:id>/void', methods=['PATCH'])
 def void_serial_number(id):
@@ -153,7 +183,7 @@ def void_serial_number(id):
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "An error occurred", "details": str(e)}), 500
-
+    
 # Query serial number records with filters and pagination
 @crud.route('/serial_numbers/query', methods=['GET'])
 def query_serial_numbers():
@@ -336,29 +366,104 @@ def query_serial_numbers_v2():
         "data": result
     }), 200
 
-@crud.route('/batch', methods=['GET'])
-def check_batch():
-    batch_id = str(request.args.get('batch_id'))
-    if not batch_id:
-        return jsonify({"error": "batch_id is required"}), 400
+# Create a new batch info record
+@crud.route('/batch', methods=['POST'])
+def create_batch_info():
+    json_data = request.get_json()
+    if not json_data:
+        return jsonify({"error": "No input data provided"}), 400
 
     try:
-        records = SerialNumberRecord.query.filter_by(batch_id=batch_id, is_deleted=False).all()
-        if records:
-            # Assuming all records in a batch have the same part_id and batch_quantity
-            first_record = records[0]
-            batch_info = {
-                "batch_id": batch_id,
-                "part_number": first_record.part_id,
-                "batch_quantity": first_record.batch_quantity,
-                "total_records": len(records),
-                "records": serial_numbers_schema.dump(records)
-            }
-            return jsonify(batch_info), 200
-        else:
-            # Batch does not exist
+        # Validate and deserialize input
+        data = batch_info_schema.load(json_data)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+
+    try:
+        new_batch = BatchInfo(**data)
+        db.session.add(new_batch)
+        db.session.commit()
+        result = batch_info_schema.dump(new_batch)
+        return jsonify({"message": "Batch info created", "data": result}), 201
+
+    except IntegrityError as e:
+        db.session.rollback()
+        return jsonify({"error": "Database integrity error", "details": str(e)}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
+
+# Create a new batch reference record
+@crud.route('/batch_reference', methods=['POST'])
+def create_batch_reference():
+    json_data = request.get_json()
+    if not json_data:
+        return jsonify({"error": "No input data provided"}), 400
+
+    try:
+        # Validate and deserialize input
+        data = batch_references_schema.load(json_data)
+    except ValidationError as err:
+        return jsonify({"errors": err.messages}), 400
+
+    try:
+        new_reference = BatchReferences(**data)
+        db.session.add(new_reference)
+        db.session.commit()
+        result = batch_references_schema.dump(new_reference)
+        return jsonify({"message": "Batch reference created", "data": result}), 201
+
+    except IntegrityError as e:
+        db.session.rollback()
+        return jsonify({"error": "Database integrity error", "details": str(e)}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "An error occurred", "details": str(e)}), 500
+
+# Retrieve batch info and associated serial numbers
+@crud.route('/batch/<int:id>', methods=['GET'])
+def get_batch_info(id):
+    batch_info = BatchInfo.query.get_or_404(id)
+    result = batch_info_schema.dump(batch_info)
+    return jsonify(result), 200
+
+# Retrieve batch references
+@crud.route('/batch', methods=['GET'])
+def check_batch():
+    batch_number = str(request.args.get('batch_number'))
+    if not batch_number:
+        return jsonify({"error": "batch_number is required"}), 400
+
+    try:
+        # Query the batch record first
+        batch_record = BatchInfo.query.filter_by(batch_number=batch_number).first()
+
+        if not batch_record:
             return jsonify({"message": "Batch not found."}), 404
+
+        # Query for serial numbers associated with the batch using a join
+        records = SerialNumberRecord.query.filter(
+            SerialNumberRecord.batch_info_id == batch_record.id,  # Compare with batch_record.id
+            SerialNumberRecord.is_deleted == False
+        ).all()
+
+        # If records exist, build the response
+        batch_info = {
+            "batch_id": batch_record.id,
+            "batch_number": batch_record.batch_number,
+            "part_number": batch_record.part_number,
+            "batch_quantity": batch_record.number_of_items,
+            "total_records": len(records),
+            "last_scanned_item": batch_record.last_scanned_item,
+            "current_item_number": batch_record.current_item_number,
+            "batch_type": batch_record.batch_type,
+            "batch_description": batch_record.batch_description,
+            "records": serial_numbers_schema.dump(records)
+        }
+
+        return jsonify(batch_info), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
-            

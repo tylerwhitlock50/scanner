@@ -1,12 +1,25 @@
 <template>
   <div class="container">
-
     <h1 class="text-center mb-4">Transaction Review</h1>
-    <div class="summary row mb-3">
+
+    <!-- Input to change batch number -->
+    <div class="form-group mb-3">
+      <label for="batchNumber">Change Batch Number:</label>
+      <input
+        type="text"
+        v-model="batchNumberInput"
+        id="batchNumber"
+        class="form-control"
+      />
+      <button class="btn btn-primary mt-2" @click="fetchBatchData">Fetch Batch Data</button>
+    </div>
+
+    <!-- Display Batch Info -->
+    <div class="summary row mb-3" v-if="batchInfo">
       <div class="col-md-6">
-        <p><strong>Batch ID:</strong> {{ batchId }}</p>
-        <p><strong>Part ID:</strong> {{ partId }}</p>
-        <p><strong>Batch Quantity:</strong> {{ batchQuantity }}</p>
+        <p><strong>Batch ID:</strong> {{ batchInfo.batchNumber }}</p>
+        <p><strong>Part ID:</strong> {{ batchInfo.partNumber }}</p>
+        <p><strong>Batch Quantity:</strong> {{ batchInfo.numberOfItems }}</p>
         <p><strong>Total Serial Numbers Scanned:</strong> {{ totalSerialNumbers }}</p>
         <p><strong>Difference:</strong> {{ difference }}</p>
       </div>
@@ -14,7 +27,9 @@
         <button class="btn btn-primary mb-2" @click="downloadReport">Download Barcodes</button>
       </div>
     </div>
-    <div class="table-responsive">
+
+    <!-- Table to Display Serial Numbers -->
+    <div v-if="serialNumbers.length > 0" class="table-responsive">
       <table class="table table-striped">
         <thead>
           <tr>
@@ -55,70 +70,85 @@
                 class="btn btn-sm btn-primary mb-1"
                 @click="markAsReviewed(serialNumber)"
               >Confirm</button>
+              <button class="btn btn-sm btn-danger mb-1" @click="deleteSerialNumber(serialNumber.id)">
+                Delete
+              </button>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-    <button class="btn btn-primary mt-3" @click="markSelectedAsReviewed">Mark Selected as Reviewed</button>
+
+    <!-- If No Serial Numbers Found -->
+    <div v-else>
+      <p>No serial numbers found for this batch.</p>
+    </div>
+
+    <div v-if="isLoading">Loading...</div>
+
+    <!-- Mark Selected Serial Numbers as Reviewed -->
+    <button class="btn btn-primary mt-3" @click="markSelectedAsReviewed" :disabled="selectedSerialNumbers.length === 0">
+      Mark Selected as Reviewed
+    </button>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import api from '../services/api';
 import { useBatchStore } from '../stores/batchStore';
 import { useRouter } from 'vue-router';
-import api from '../services/api';
-
-
 
 export default {
   setup() {
+    const batchStore = useBatchStore();
+    const router = useRouter();
     const serialNumbers = ref([]);
     const selectedSerialNumbers = ref([]);
     const selectAll = ref(false);
-    const snackbar = ref(false);
-    const snackbarMessage = ref('Please enter batch information first.');
+    const isLoading = ref(false);
 
-    // Access the batch store
-    const batchStore = useBatchStore();
-    const router = useRouter();
+    // Input for changing batch number
+    const batchNumberInput = ref(batchStore.getBatchData().batchNumber);
 
-    // Computed properties for batch information
-    const batchId = computed(() => batchStore.batchData.batchNumber || 'N/A');
-    const partId = computed(() => batchStore.batchData.partNumber || 'N/A');
-    const batchQuantity = computed(() => batchStore.batchData.numberOfItems || 0);
-
+    const batchInfo = computed(() => batchStore.getBatchData());
     const totalSerialNumbers = computed(() => serialNumbers.value.length);
+    const difference = computed(() => batchInfo.value.numberOfItems - totalSerialNumbers.value);
 
-    // Define the difference computed property
-    const difference = computed(() => {
-      return batchQuantity.value - totalSerialNumbers.value;
-    });
+    const fetchBatchData = async () => {
+      if (!batchNumberInput.value) {
+        alert('Please enter a batch number.');
+        return;
+      }
 
-    // Function to check if batch data is empty
-    const isBatchDataEmpty = () => {
-      const batchData = batchStore.getBatchData();
-      return (
-        batchData.batchNumber === '' &&
-        batchData.numberOfItems === 0 &&
-        batchData.partNumber === ''
-      );
-    };
-
-    const fetchSerialNumbers = async () => {
+      isLoading.value = true;
       try {
-        const response = await api.get('/serial_numbers/query', {
-          params: {
-            batch_id: batchStore.batchData.batchNumber,
-          },
-        });
-        serialNumbers.value = response.data.data.map(sn => ({
-          ...sn,
-          editing: false,
-        }));
+        const response = await api.get('/batch', { params: { batch_number: batchNumberInput.value } });
+        if (response.status === 200) {
+          const data = response.data;
+          serialNumbers.value = data.records.map(record => ({
+            ...record,
+            editing: false,
+          }));
+
+          // Update batch store with new data
+          batchStore.setBatchData(
+            data.batch_number,
+            data.batch_quantity,
+            data.part_number,
+            data.batch_type,
+            data.batch_description,
+            data.id
+          );
+        } else {
+          serialNumbers.value = [];
+          alert('Batch not found or an error occurred.');
+        }
       } catch (error) {
-        console.error('Error fetching serial numbers:', error);
+        console.error('Error fetching batch data:', error);
+        alert('An error occurred while fetching batch data.');
+      } finally {
+        isLoading.value = false;
       }
     };
 
@@ -136,9 +166,7 @@ export default {
 
     const saveSerialNumber = async (serialNumber) => {
       try {
-        await api.put(`/serial_number/${serialNumber.id}`, {
-          verified_sn: serialNumber.verified_sn,
-        });
+        await api.put(`/serial_number/${serialNumber.id}`, { verified_sn: serialNumber.verified_sn });
         serialNumber.editing = false;
       } catch (error) {
         console.error('Error updating serial number:', error);
@@ -147,21 +175,29 @@ export default {
 
     const markAsReviewed = async (serialNumber) => {
       try {
-        await api.put(`/serial_number/${serialNumber.id}`, {
-          is_verified: true,
-        });
+        await api.put(`/serial_number/${serialNumber.id}`, { is_verified: true });
         serialNumber.is_verified = true;
       } catch (error) {
-        console.error('Error updating serial number:', error);
+        console.error('Error marking serial number as reviewed:', error);
+      }
+    };
+
+    const deleteSerialNumber = async (id) => {
+      const confirmed = confirm('Are you sure you want to delete this serial number?');
+      if (!confirmed) return;
+
+      try {
+        await api.delete(`/serial_number/${id}`);
+        serialNumbers.value = serialNumbers.value.filter(record => record.id !== id);
+      } catch (error) {
+        console.error('Error deleting serial number:', error);
       }
     };
 
     const markSelectedAsReviewed = async () => {
       try {
         await Promise.all(
-          selectedSerialNumbers.value.map(id =>
-            api.put(`/serial_number/${id}`, { is_verified: true })
-          )
+          selectedSerialNumbers.value.map(id => api.put(`/serial_number/${id}`, { is_verified: true }))
         );
         serialNumbers.value.forEach(sn => {
           if (selectedSerialNumbers.value.includes(sn.id)) {
@@ -171,20 +207,20 @@ export default {
         selectedSerialNumbers.value = [];
         selectAll.value = false;
       } catch (error) {
-        console.error('Error updating serial numbers:', error);
+        console.error('Error marking selected serial numbers as reviewed:', error);
       }
     };
 
     const downloadReport = async () => {
       try {
         const response = await api.get('/serial_numbers/report', {
-          params: { batch_id: batchStore.batchData.batchNumber },
+          params: { batch_id: batchInfo.value.batchNumber },
           responseType: 'blob',
         });
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `Batch_${batchStore.batchData.batchNumber}_Report.pdf`);
+        link.setAttribute('download', `Batch_${batchInfo.value.batchNumber}_Report.pdf`);
         document.body.appendChild(link);
         link.click();
       } catch (error) {
@@ -192,38 +228,30 @@ export default {
       }
     };
 
-    // Show notification and redirect if batch data is missing
-    const showNotification = (message, delay = 0) => {
-      alert(message);
-      setTimeout(() => {
-        router.push({ name: 'BatchInput' }); // Redirect to batch input screen
-      }, delay);
-    };
-
-    // Check batch data when component is mounted
     onMounted(() => {
-      if (isBatchDataEmpty()) {
-        showNotification('Please enter batch information first.');
-        return;
+      // Fetch batch data immediately if batch number exists
+      if (batchStore.getBatchData().batchNumber) {
+        fetchBatchData();
       }
-      fetchSerialNumbers();
     });
 
     return {
+      batchNumberInput,
+      batchInfo,
       serialNumbers,
       selectedSerialNumbers,
       selectAll,
-      batchId,
-      partId,
-      batchQuantity,
       totalSerialNumbers,
       difference,
+      isLoading,
       toggleSelectAll,
       editSerialNumber,
       saveSerialNumber,
       markAsReviewed,
       markSelectedAsReviewed,
+      deleteSerialNumber,
       downloadReport,
+      fetchBatchData,
     };
   },
 };
@@ -232,5 +260,34 @@ export default {
 <style scoped>
 .summary p {
   margin-bottom: 0.5rem;
+}
+
+.table-responsive {
+  margin-top: 20px;
+}
+
+.table th, .table td {
+  text-align: center;
+}
+
+button {
+  padding: 8px 12px;
+  margin: 4px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #007bff;
+  color: white;
+}
+
+.btn {
+  padding: 8px 12px;
+}
+
+input[type="checkbox"] {
+  cursor: pointer;
 }
 </style>

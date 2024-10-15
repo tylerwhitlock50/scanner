@@ -10,6 +10,7 @@ import router from './router';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import 'bootstrap';
 
+
 // Import Vuetify from the plugins folder
 import vuetify from './plugins/vuetify';
 

@@ -213,7 +213,8 @@
     //recorded_sn: false,
     //recorded_sn_timestamp: new Date().toISOString(),
     //recorded_sn_user: 'None', // Replace with actual operator ID if available
-    sn_status_id: 1, // Set appropriate status ID
+    sn_status_id: 'NewScan', // Set appropriate status ID
+    batch_info_id: batchData.batch_info_id
   };
   
     api
@@ -249,9 +250,9 @@
     //snackbar.value = true;
     // Delay the redirection by `delay` milliseconds (default is 3000ms = 3 seconds)
     alert(message);
-  setTimeout(() => {
-    router.push({ name: 'BatchInput' });  // Redirect to batch input route after the delay
-  }, delay);
+  // setTimeout(() => {
+  //   router.push({ name: 'BatchInput' });  // Redirect to batch input route after the delay
+  // }, delay);
   };
 
 
@@ -259,6 +260,12 @@
   onMounted(() => {
     if (isBatchDataEmpty()) {
         showNotification('Please enter batch information first.');
+        router.push({ name: 'BatchInput' });  // Redirect to batch input route after the delay
+    return;
+  }
+  if (batchStore.batchData.currentCount >= batchStore.batchData.numberOfItems) {
+    showNotification('Batch scanning is complete. Redirecting to Batch Review page...');
+    router.push({ name: 'TransactionReviewView' });
     return;
   }
     startWebcam();

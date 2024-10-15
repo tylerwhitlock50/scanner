@@ -45,22 +45,42 @@ class SerialNumberRecord(db.Model):
     recorded_sn_user = db.Column(db.String(50))
 
     # Serial Number Status (foreign key to SnStatus table)
-    sn_status_id = db.Column(db.Integer, db.ForeignKey('sn_status.id'), nullable=False)
-    
-    # Relationship to sn_status table
-    sn_status = db.relationship('SnStatus', backref='serial_numbers')
+    sn_status_id = db.Column(db.String, nullable=False)
 
     # Voided
     voided = db.Column(db.Boolean, default=False)
     voided_timestamp = db.Column(db.DateTime)
     voided_user = db.Column(db.String(50))
 
-class SnStatus(db.Model):  # Renamed for Python class naming convention
+    # Link to BatchInfo
+    batch_info_id = db.Column(db.Integer, db.ForeignKey('batch_info.batch_number'))
+    batch_info = db.relationship('BatchInfo', back_populates='serial_number_records')
+
+
+class BatchInfo(db.Model):  # Renamed for Python class naming convention
     id = db.Column(db.Integer, primary_key=True)
-    status = db.Column(db.String(50), unique=True, nullable=False)
-    description = db.Column(db.Text)
+    batch_number = db.Column(db.String(50), unique=True, nullable=False)
+    number_of_items = db.Column(db.Integer, nullable=False)
+    part_number = db.Column(db.String(50), nullable=False)
+    batch_description = db.Column(db.Text)
+    batch_type = db.Column(db.String(50))
+    last_scanned_item = db.Column(db.String(50))
+    current_item_number = db.Column(db.Integer, default=0)
+
+    # Relationship to SerialNumberRecord
+    serial_number_records = db.relationship('SerialNumberRecord', back_populates='batch_info')
+
+    # Relationship to BatchReferences
+    batch_references = db.relationship('BatchReferences', back_populates='batch_info')
 
 
-
-
-
+class BatchReferences(db.Model):  # Renamed for Python class naming convention
+    id = db.Column(db.Integer, primary_key=True)
+    file_name = db.Column(db.String(100))
+    file_description = db.Column(db.Text)
+    
+    # ForeignKey to BatchInfo
+    batch_info_id = db.Column(db.Integer, db.ForeignKey('batch_info.id'))
+    
+    # Relationship to BatchInfo
+    batch_info = db.relationship('BatchInfo', back_populates='batch_references')

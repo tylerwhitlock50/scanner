@@ -11,6 +11,7 @@ export const useBatchStore = defineStore('batch', {
       currentCount: 0,
       batchType: 'inbound', // Example default value
       batch_description: '', // Example default value
+      batch_info_id: null, // Example default value
     },
   }),
   actions: {
@@ -19,7 +20,7 @@ export const useBatchStore = defineStore('batch', {
       return this.batchData;
     },
     // Method to set or update batch data
-    setBatchData(batchNumber, numberOfItems, partNumber, batchType, batch_description) {
+    setBatchData(batchNumber, numberOfItems, partNumber, batchType, batch_description, batch_info_id) {
       this.batchData = {
         batchNumber: batchNumber,
         numberOfItems: numberOfItems,
@@ -28,6 +29,7 @@ export const useBatchStore = defineStore('batch', {
         currentCount: 0,
         batchType: batchType,
         batch_description: batch_description,
+        batch_info_id: batch_info_id,
       };
     },
     // Method to verify batch
