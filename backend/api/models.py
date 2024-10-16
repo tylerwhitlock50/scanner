@@ -53,7 +53,7 @@ class SerialNumberRecord(db.Model):
     voided_user = db.Column(db.String(50))
 
     # Link to BatchInfo
-    batch_info_id = db.Column(db.Integer, db.ForeignKey('batch_info.batch_number'))
+    batch_info_id = db.Column(db.Integer, db.ForeignKey('batch_info.id'))
     batch_info = db.relationship('BatchInfo', back_populates='serial_number_records')
 
 

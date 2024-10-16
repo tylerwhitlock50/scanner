@@ -29,6 +29,18 @@ services:
     environment:
       - VITE_APP_API_URL==http://backend:5000  # URL for backend communication
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak_auth
+    environment:
+      - KEYCLOAK_ADMIN=admin@shotsheet.com
+      - KEYCLOAK_ADMIN_PASSWORD=Whit123+
+    ports:
+      - "8081:8080"  # Expose Keycloak on port 8081
+    networks:
+      - app-network  # Connect Keycloak to the same network
+    command: ["start-dev"]  # Start Keycloak in development mode
+
 networks:
   app-network:
     driver: bridge  # Use the default bridge driver

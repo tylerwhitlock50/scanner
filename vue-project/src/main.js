@@ -13,6 +13,20 @@ import 'bootstrap';
 
 // Import Vuetify from the plugins folder
 import vuetify from './plugins/vuetify';
+import keycloak from './services/keycloak';
+
+
+keycloak.init({ onLoad: 'login-required' }).then((authenticated) => {
+    if (!authenticated) {
+      window.location.reload();
+    } else {
+      const app = createApp(App);
+      app.config.globalProperties.$keycloak = keycloak;
+      app.mount('#app');
+    }
+  }).catch(() => {
+    console.error('Keycloak initialization failed');
+  });
 
 // Create the app instance
 const app = createApp(App);
